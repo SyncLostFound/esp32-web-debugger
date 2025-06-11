@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ESP32 Web Debugger</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background-color: #121212;
+      color: #eee;
+    }
+    header {
+      text-align: center;
+      padding: 1em;
+      font-size: 1.8em;
+      background: linear-gradient(90deg, #03a9f4, #0d47a1);
+      color: white;
+      box-shadow: 0 0 20px #0d47a1;
+    }
+    #vin {
+      text-align: center;
+      font-size: 1.2em;
+      margin: 1em 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1em;
+      padding: 1em;
+    }
+    .pin {
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 1em;
+      background-color: #1e1e1e;
+      box-shadow: 0 0 10px #03a9f4aa;
+    }
+    .title {
+      font-size: 1.1em;
+      margin-bottom: 0.5em;
+      color: #03a9f4;
+    }
+    .state {
+      margin: 0.5em 0;
+    }
+    .bounce {
+      font-size: 0.9em;
+      color: #ccc;
+      margin-top: 4px;
+    }
+    button, select, input[type='number'], input[type='text'] {
+      margin-top: 0.2em;
+      background-color: #03a9f4;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover, select:hover {
+      background-color: #0288d1;
+    }
+    select, input[type='number'], input[type='text'] {
+      width: 100%;
+    }
+    #log {
+      padding: 1em;
+      background: #000;
+      color: #0f0;
+      font-family: monospace;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      margin: 1em;
+      border: 1px solid #222;
+    }
+    #clearLog {
+      display: block;
+      margin: 0 auto;
+      background: #d32f2f;
+      color: white;
+      margin-bottom: 1em;
+    }
+    #oscilloContainer {
+      position: relative;
+      width: 300px;
+      height: 120px;
+      margin: 1em auto;
+      background: #1e1e1e;
+      border: 1px solid #444;
+    }
+    #oscilloGraph {
+      width: 100%;
+      height: 100%;
+    }
+    #oscilloScale {
+      position: absolute;
+      left: 5px;
+      top: 5px;
+      color: #ccc;
+      font-size: 12px;
+      font-family: monospace;
+      line-height: 1.3;
+    }
+    .section {
+      margin: 1em auto;
+      padding: 1em;
+      width: 90%;
+      background: #1c1c1c;
+      border: 1px solid #444;
+    }
+    .section h3 {
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <header>ESP32 Web Debugger</header>
+  <div id="vin">VIN: -- V</div>
+  <div id="oscilloContainer">
+    <canvas id="oscilloGraph"></canvas>
+    <div id="oscilloScale">
+      3.3V<br>2.5V<br>1.6V<br>0.8V<br>0.0V
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Oscilloscope Settings</h3>
+    <label for="oscPin">Select Analog Pin:</label>
+    <select id="oscPin">
+      <option value="34">GPIO34</option>
+      <option value="35">GPIO35</option>
+      <option value="36">GPIO36</option>
+      <option value="39">GPIO39</option>
+    </select>
+  </div>
+
+  <div class="grid" id="pinGrid"></div>
+
+  <div class="section">
+    <h3>UART Terminal</h3>
+    <input type="text" id="uartInput" placeholder="Send UART text">
+    <button onclick="sendUART()">Send</button>
+    <button onclick="readUART()">Read</button>
+  </div>
+
+  <div class="section">
+    <h3>I2C Scanner</h3>
+    <button onclick="scanI2C()">Scan I2C Bus</button>
+    <p id="i2cResults">--</p>
+  </div>
+
+  <button id="clearLog">Clear Log</button>
+  <div id="log">Connecting to ESP32...</div>
+
+  <script>
+    const pinGrid = document.getElementById("pinGrid");
+    const logBox = document.getElementById("log");
+    const clearBtn = document.getElementById("clearLog");
+    const vinLabel = document.getElementById("vin");
+    const oscilloCanvas = document.getElementById("oscilloGraph");
+    const ctx = oscilloCanvas.getContext("2d");
+    const oscPinSelect = document.getElementById("oscPin");
+    const i2cResultsBox = document.getElementById("i2cResults");
+
+    oscilloCanvas.width = oscilloCanvas.clientWidth;
+    oscilloCanvas.height = oscilloCanvas.clientHeight;
+    let oscilloData = [];
+    let pinStates = {};
+
+    let socket;
+
+    function log(msg) {
+      logBox.textContent += msg + "\n";
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    clearBtn.onclick = () => logBox.textContent = "";
+
+    oscPinSelect.onchange = () => {
+      const pin = oscPinSelect.value;
+      socket.send(`OSCILLO:${pin}`);
+      log(`📡 Oscilloscope pin set to ${pin}`);
+    };
+
+    function createOrUpdatePinCard(pinData) {
+      const { pin, mode, state, bounce } = pinData;
+      let card = document.getElementById(`pin-${pin}`);
+
+      if (!card) {
+        card = document.createElement("div");
+        card.className = "pin";
+        card.id = `pin-${pin}`;
+        card.innerHTML = `
+          <div class="title">GPIO${pin}</div>
+          <div class="mode">
+            <select id="mode-${pin}">
+              <option value="INPUT">INPUT</option>
+              <option value="OUTPUT">OUTPUT</option>
+              <option value="PWM">PWM</option>
+            </select>
+          </div>
+          <div class="state" id="state-${pin}">State: <strong>--</strong></div>
+          <div class="bounce" id="bounce-${pin}">Bounce Count: 0</div>
+          <div id="controls-${pin}" class="controls"></div>
+        `;
+        pinGrid.appendChild(card);
+
+        document.getElementById(`mode-${pin}`).addEventListener("change", (e) => {
+          const newMode = e.target.value;
+          socket.send(`MODE:${pin},${newMode}`);
+          renderControls(pin, newMode);
+        });
+      }
+
+      pinStates[pin] = { mode, state, bounce };
+
+      const modeSelect = document.getElementById(`mode-${pin}`);
+      if (modeSelect.value !== mode) modeSelect.value = mode;
+
+      document.getElementById(`state-${pin}`).innerHTML = `State: <strong>${state ? "HIGH" : "LOW"}</strong>`;
+      document.getElementById(`bounce-${pin}`).textContent = `Bounce Count: ${bounce}`;
+
+      renderControls(pin, mode, state);
+    }
+
+    function renderControls(pin, mode, state = 0) {
+      const container = document.getElementById(`controls-${pin}`);
+      container.innerHTML = "";
+
+      if (mode === "OUTPUT") {
+        const highBtn = document.createElement("button");
+        highBtn.textContent = "HIGH";
+        highBtn.onclick = () => socket.send(`WRITE:${pin},1`);
+
+        const lowBtn = document.createElement("button");
+        lowBtn.textContent = "LOW";
+        lowBtn.onclick = () => socket.send(`WRITE:${pin},0`);
+
+        container.appendChild(highBtn);
+        container.appendChild(lowBtn);
+      } else if (mode === "PWM") {
+        const pwmInput = document.createElement("input");
+        pwmInput.type = "number";
+        pwmInput.min = "1";
+        pwmInput.max = "10000";
+        pwmInput.placeholder = "PWM Hz";
+        pwmInput.style.marginTop = "0.5em";
+        pwmInput.onchange = () => {
+          const val = parseInt(pwmInput.value);
+          if (!isNaN(val)) socket.send(`PWM:${pin},${val}`);
+        };
+        container.appendChild(pwmInput);
+      }
+    }
+
+    function updatePins(pins) {
+      const seen = new Set();
+      pins.forEach(pinData => {
+        seen.add(pinData.pin);
+        createOrUpdatePinCard(pinData);
+      });
+
+      Object.keys(pinStates).forEach(pinId => {
+        if (!seen.has(Number(pinId))) {
+          const el = document.getElementById(`pin-${pinId}`);
+          if (el) el.remove();
+          delete pinStates[pinId];
+        }
+      });
+    }
+
+    function fetchVIN() {
+      fetch("/api/vin").then(r => r.text()).then(txt => {
+        vinLabel.textContent = `VIN: ${txt} V`;
+      });
+    }
+
+    function sendUART() {
+      const text = document.getElementById("uartInput").value;
+      if (text.trim()) socket.send(`UART_SEND:${text}`);
+    }
+
+    function readUART() {
+      socket.send("UART_READ");
+    }
+
+    function scanI2C() {
+      socket.send("I2C_SCAN");
+    }
+
+    function drawOscillo(data) {
+      ctx.clearRect(0, 0, oscilloCanvas.width, oscilloCanvas.height);
+      ctx.beginPath();
+      ctx.strokeStyle = "#03a9f4";
+      ctx.lineWidth = 2;
+
+      data.forEach((v, i) => {
+        const x = (i / data.length) * oscilloCanvas.width;
+        const y = oscilloCanvas.height - (v / 3.3) * oscilloCanvas.height;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+
+      ctx.stroke();
+    }
+
+    function handleMessage(data) {
+      try {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+          updatePins(parsed);
+        } else if (parsed.oscilloscope) {
+          oscilloData.push(parsed.oscilloscope.voltage);
+          if (oscilloData.length > 100) oscilloData.shift();
+          drawOscillo(oscilloData);
+        } else if (parsed.i2c) {
+          const devices = parsed.i2c;
+          i2cResultsBox.textContent = devices.length
+            ? "Addresses: " + devices.map(addr => "0x" + addr.toString(16)).join(", ")
+            : "No devices found.";
+          log("🔍 I2C devices: " + JSON.stringify(devices));
+        } else {
+          log("ℹ️ " + JSON.stringify(parsed));
+        }
+      } catch {
+        log("⚠️ Malformed: " + data);
+      }
+    }
+
+    function setupWebSocket() {
+      socket = new WebSocket(`ws://${location.hostname}/ws`);
+      socket.onopen = () => log("WebSocket connected");
+      socket.onmessage = e => handleMessage(e.data);
+      socket.onerror = () => log("WebSocket error");
+      socket.onclose = () => {
+        log("WebSocket closed. Reconnecting...");
+        setTimeout(setupWebSocket, 2000);
+      };
+    }
+
+    setupWebSocket();
+    setInterval(fetchVIN, 1000);
+  </script>
+</body>
+</html>
