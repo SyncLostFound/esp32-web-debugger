@@ -65,7 +65,9 @@ You're welcome to clone and experiment with the current version, but expect mino
 
 4. **Flash the firmware** with the ESP32 sketch (includes server, WebSocket logic, and pin control backend).
 
-5. **Connect to the ESP32's IP address** in a browser on the same WiFi network.
+5. **Configure WiFi**  Enter your SSID and password into the code before uploading it to the ESP32.
+
+6. **Connect to the ESP32's IP address**  The IP address will be shown in the Serial Monitor once the ESP32 connects to WiFi. Open that address in a browser on the same WiFi network.
 
 ---
 
