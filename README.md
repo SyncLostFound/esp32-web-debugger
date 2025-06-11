@@ -8,6 +8,14 @@ This project **requires ESP32 Arduino core version `2.0.17` or `2.0.18`** to wor
 
 > **⚠️ Status: Currently in development / buggy.**  
 > Some features like pin dropdowns and PWM input fields may refresh too often or cause UI jank. Known rendering issues are being refined.
+>
+> ⚠️ **Please note**:
+- The project is still under active development.
+- I plan to migrate this codebase to use the **latest stable ESP32 Arduino core**, along with more modern and officially supported **web libraries** (such as `WebServer.h`, `AsyncWebSocket`, or `esp_websocket_server` from the ESP-IDF).
+- Future updates will also support **Arduino IDE 2.x**, improved frontend modularity, and a full WebSocket abstraction layer.
+
+You're welcome to clone and experiment with the current version, but expect minor bugs and performance issues due to version quirks in `2.0.17/18`.
+
 
 ---
 
