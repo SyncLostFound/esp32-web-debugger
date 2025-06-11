@@ -8,8 +8,8 @@
 #include <HardwareSerial.h>
 #include <driver/ledc.h>
 
-const char* ssid = "MESH-WIFI-6222";
-const char* password = "ShivelyPoland97ZS";
+const char* ssid = "YOUR-SSID";
+const char* password = "PASSWORD";
 
 AsyncWebServer server(80);
 AsyncWebSocket webSocket("/ws");
