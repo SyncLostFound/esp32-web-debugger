@@ -1,0 +1,120 @@
+# ESP32 Web Debugger — Installation Guide
+
+This guide explains how to install and run the ESP32 Web Debugger on your ESP32 board. Make sure you are using **ESP32 Arduino Core version 2.0.17 or 2.0.18** to avoid compatibility issues with the web server and WebSocket features.
+
+---
+
+## ✅ Requirements
+
+### Hardware
+- ESP32 development board (DevKit, NodeMCU, Lolin D32, etc.)
+- USB cable
+- Optional: I2C and UART peripherals, analog sensors for oscilloscope
+
+### Software
+- Arduino IDE (v1.8+ or 2.x) or PlatformIO (VSCode)
+- [ESP32 Board Support](https://github.com/espressif/arduino-esp32)
+- ESPAsyncWebServer and AsyncTCP libraries
+- SPIFFS filesystem support
+
+---
+
+## 📥 Step-by-Step Setup
+
+### 1. Install ESP32 Arduino Core
+
+#### For Arduino IDE:
+- Open **Preferences** → paste this URL in "Additional Board Manager URLs":  
+
+https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
+- Go to **Tools > Board > Board Manager**, search for `esp32`, and install version `2.0.18` (or `2.0.17`).
+
+#### For PlatformIO:
+In `platformio.ini`:
+```ini
+platform = espressif32
+board = esp32dev
+framework = arduino
+platform_packages = 
+platformio/framework-arduinoespressif32 @ 3.20017.0
+
+2. Install Required Libraries
+
+Install these libraries using Arduino Library Manager or place them in your lib/ folder for PlatformIO:
+
+    ESPAsyncWebServer
+
+    AsyncTCP
+
+    Make sure to install versions compatible with ESP32 2.0.17/18.
+
+3. Upload the HTML Frontend
+
+The web UI (index.html) must be uploaded to the ESP32’s SPIFFS filesystem.
+Arduino:
+
+    Place the index.html file into a folder named data/.
+
+    Use the ESP32 Sketch Data Upload Tool (install separately).
+
+    Run Tools > ESP32 Sketch Data Upload.
+
+PlatformIO:
+
+Ensure your project contains:
+
+[env:esp32dev]
+board = esp32dev
+platform = espressif32
+framework = arduino
+upload_fs = true
+monitor_speed = 115200
+
+Then run:
+
+pio run --target uploadfs
+
+4. Flash the ESP32
+
+Upload your .ino or main.cpp firmware code using the usual upload button or:
+
+pio run --target upload
+
+5. Connect and Use
+
+    Power up the ESP32 and connect to the same WiFi network.
+
+    Open the Serial Monitor to find the assigned IP address.
+
+    In your browser, go to:
+
+    http://<ESP32-IP-ADDRESS>/
+
+    The full debugger UI should load, with live GPIO, analog, UART, and I2C tools.
+
+🧪 Troubleshooting
+
+    WebSocket not connecting? Make sure your ESP32 and PC/phone are on the same WiFi.
+
+    Seeing Too many messages queued in Serial Monitor? You may be flooding the WebSocket with data — reduce polling rate or optimize backend.
+
+    Frontend not loading? Ensure SPIFFS is mounted with SPIFFS.begin(true);
+
+📁 Project Structure Recap
+
+ESP32-Web-Debugger/
+├── data/
+│   └── index.html       # Full web interface
+├── src/
+│   └── main.ino         # ESP32 backend logic
+├── platformio.ini       # (optional) if using PlatformIO
+├── README.md
+└── INSTALL.md
+
+Happy debugging! 🧠💡
+
+
+---
+
+Let me know if you'd like both files packaged together in a ZIP with the current `.html` file for GitHub upload or offline backup!
