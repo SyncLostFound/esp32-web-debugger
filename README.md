@@ -4,7 +4,9 @@ A full-featured web-based GPIO and serial debugger for ESP32 boards. This tool p
 
 ## 🚨 Important Note
 
-This project **requires ESP32 Arduino core version `2.0.17` or `2.0.18`** to work correctly. The built-in async web libraries, file system mounting, and WebSocket handling are not guaranteed to work as expected in earlier or later versions due to API changes.
+This project was originally started some time ago using the **ESP32 Arduino Core version 2.0.17**, which was stable at the time and supported the web server and WebSocket features used here. Some libraries and approaches (like `ESPAsyncWebServer`) may now be outdated or deprecated in newer versions.
+
+ **requires ESP32 Arduino core version `2.0.17` or `2.0.18`** to work correctly. The built-in async web libraries, file system mounting, and WebSocket handling are not guaranteed to work as expected in earlier or later versions due to API changes.
 
 > **⚠️ Status: Currently in development / buggy.**  
 > Some features like pin dropdowns and PWM input fields may refresh too often or cause UI jank. Known rendering issues are being refined.
